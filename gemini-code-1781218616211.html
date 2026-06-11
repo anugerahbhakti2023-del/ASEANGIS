@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peta Interaktif Negara-Negara ASEAN GIS</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary: #0A3D62;
+            --secondary: #20BF6B;
+            --accent: #FFC312;
+            --bg-color: #f0f4f8;
+            --text-main: #2d3436;
+            --text-muted: #636e72;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            --nav-bg: rgba(255, 255, 255, 0.9);
+        }
+
+        [data-theme="dark"] {
+            --primary: #4ab3f4;
+            --secondary: #26de81;
+            --bg-color: #121f28;
+            --text-main: #f5f6fa;
+            --text-muted: #b2bec3;
+            --glass-bg: rgba(18, 31, 40, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            --nav-bg: rgba(18, 31, 40, 0.9);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            transition: background-color 0.3s, color 0.3s;
+            overflow-x: hidden;
+        }
+
+        /* Scroll Progress Bar */
+        #scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            z-index: 9999;
+            transition: width 0.1s;
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-color);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--glass-border);
+            border-top-color: var(--secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Glassmorphism Utilities */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--card-shadow);
+            border-radius: 16px;
+        }
+
+        /* Layout & Typography */
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        section { padding: 80px 0; }
+        h1, h2, h3 { color: var(--primary); margin-bottom: 15px; }
+        [data-theme="dark"] h1, [data-theme="dark"] h2, [data-theme="dark"] h3 { color: var(--text-main); }
+        .text-center { text-align: center; }
+        
+        /* Navbar dengan Auto-Hide */
+        nav {
+            position: fixed;
+            top: 0; 
+            width: 100%;
+            background: var(--nav-bg);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            padding: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: top 0.4s ease-in-out;
+        }
+        .nav-container { display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Logo */
+        .logo { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            font-size: 1.5rem; 
+            font-weight: 800; 
+            color: var(--primary); 
+            text-decoration: none; 
+        }
+        .logo i { font-size: 1.8rem; color: var(--secondary); }
+        [data-theme="dark"] .logo { color: var(--text-main); }
+        
+        .nav-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+        }
+        .nav-content.hidden {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            position: absolute;
+            pointer-events: none;
+            right: 60px;
+        }
+        
+        .nav-links { display: flex; gap: 20px; list-style: none; }
+        .nav-links a { color: var(--text-main); text-decoration: none; font-weight: 500; transition: color 0.3s; }
+        .nav-links a:hover { color: var(--secondary); }
+        .theme-toggle { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-main); }
+        
+        .menu-toggle {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-main);
+            margin-left: auto;
+            z-index: 1001;
+            display: none;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 12px 28px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(10, 61, 98, 0.3); }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-secondary:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(32, 191, 107, 0.3); }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding-top: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: ''; position: absolute; top: -10%; right: -5%; width: 500px; height: 500px;
+            background: var(--secondary); filter: blur(150px); opacity: 0.2; border-radius: 50%; z-index: -1;
+        }
+        .hero-content { flex: 1; padding-right: 40px; }
+        .hero-title { font-size: 3.5rem; line-height: 1.2; margin-bottom: 20px; }
+        .hero-subtitle { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 30px; }
+        .hero-buttons { display: flex; gap: 15px; }
+        .hero-image { flex: 1; display: flex; justify-content: center; }
+        .hero-image img { width: 100%; max-width: 500px; animation: float 6s ease-in-out infinite; }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0px); } }
+
+        /* Statistics Counter */
+        .stats-counter {
+            display: flex; justify-content: center; gap: 40px; margin-bottom: 40px; padding: 20px;
+        }
+        .stat-box { text-align: center; }
+        .stat-box h3 { font-size: 2.5rem; color: var(--secondary); margin-bottom: 5px; }
+
+        /* Search Bar */
+        .search-container {
+            max-width: 600px; margin: 0 auto 40px; position: relative;
+        }
+        .search-input {
+            width: 100%; padding: 15px 25px; border-radius: 30px; border: 1px solid var(--glass-border);
+            background: var(--glass-bg); color: var(--text-main); font-size: 1rem; outline: none;
+        }
+        .search-results {
+            position: absolute; top: 100%; left: 0; width: 100%; background: var(--glass-bg);
+            border-radius: 15px; margin-top: 10px; z-index: 1010; display: none;
+            box-shadow: var(--card-shadow); backdrop-filter: blur(10px); max-height: 200px; overflow-y: auto;
+        }
+        .search-item { padding: 10px 20px; cursor: pointer; border-bottom: 1px solid var(--glass-border); }
+        .search-item:hover { background: rgba(32, 191, 107, 0.2); }
+
+        /* Map Section */
+        .map-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 30px; align-items: start; }
+        #map { height: 600px; border-radius: 16px; box-shadow: var(--card-shadow); border: 2px solid var(--glass-border); z-index: 1; }
+        
+        .custom-flag-icon {
+            border: 2px solid white;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            object-fit: cover;
+            transition: transform 0.2s;
+        }
+        .custom-flag-icon:hover {
+            transform: scale(1.2) translateY(-5px);
+        }
+        .province-marker {
+            background: var(--secondary);
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(0,0,0,0.4);
+        }
+
+        /* Info Panel */
+        .info-panel {
+            padding: 30px; height: 600px; overflow-y: auto; display: none; animation: slideInRight 0.5s forwards;
+        }
+        .info-panel::-webkit-scrollbar { width: 6px; }
+        .info-panel::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 10px; }
+        .panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--glass-border); padding-bottom: 15px; }
+        .panel-header img { width: 60px; height: 40px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        /* Interactive Buttons in Header */
+        .header-actions { margin-left: auto; display: flex; gap: 15px; }
+        .action-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; transition: color 0.3s, transform 0.2s; }
+        .action-btn:hover { transform: scale(1.1); }
+        .fav-btn { color: #ccc; }
+        .fav-btn.active { color: #e74c3c; }
+        .voice-btn { color: var(--primary); }
+        [data-theme="dark"] .voice-btn { color: var(--secondary); }
+
+        .info-section { margin-bottom: 20px; }
+        .info-section h4 { color: var(--secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .info-list { list-style: none; }
+        .info-list li { margin-bottom: 8px; font-size: 0.95rem; }
+        .info-list strong { color: var(--primary); }
+        [data-theme="dark"] .info-list strong { color: #81ecec; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: rgba(32, 191, 107, 0.1); color: var(--secondary); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--secondary); }
+
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Comparison Section */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+        .compare-selects { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; }
+        select { padding: 10px 20px; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-main); font-size: 1rem; outline: none; }
+        .compare-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .compare-table th, .compare-table td { padding: 15px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+        .compare-table th { background: rgba(10, 61, 98, 0.1); color: var(--primary); width: 33%; }
+        [data-theme="dark"] .compare-table th { color: var(--secondary); }
+
+        /* Gallery */
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .gallery-item { height: 200px; border-radius: 15px; overflow: hidden; cursor: pointer; position: relative; }
+        .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+        .gallery-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        .gallery-item:hover img { transform: scale(1.1); }
+        .gallery-item:hover .gallery-overlay { opacity: 1; }
+        .gallery-overlay span { color: white; font-weight: 600; font-size: 1.2rem; }
+
+        /* Modal Preview */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .modal-content { max-width: 80%; max-height: 80%; position: relative; }
+        .modal-content img { width: 100%; max-height: 80vh; object-fit: contain; border-radius: 10px; }
+        .close-modal { position: absolute; top: -40px; right: 0; color: white; font-size: 2rem; cursor: pointer; background: none; border: none; }
+
+        /* Stats & Quiz & Facts */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .chart-container { padding: 20px; height: 350px; }
+        .quiz-container { max-width: 800px; margin: 0 auto; padding: 40px; }
+        .progress-bar-container { width: 100%; height: 10px; background: rgba(0,0,0,0.1); border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
+        .quiz-progress { height: 100%; background: var(--secondary); width: 0%; transition: width 0.3s; }
+        .options-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 20px; }
+        .option-btn { padding: 15px 20px; text-align: left; border: 1px solid var(--glass-border); background: var(--glass-bg); border-radius: 10px; cursor: pointer; font-size: 1rem; color: var(--text-main); transition: all 0.2s; }
+        .option-btn:hover { background: rgba(32, 191, 107, 0.2); }
+        .option-btn.correct { background: var(--secondary); color: white; }
+        .option-btn.wrong { background: #e74c3c; color: white; }
+        #quiz-result { display: none; text-align: center; }
+        .fact-section { text-align: center; }
+        .fact-box { max-width: 600px; margin: 30px auto; padding: 30px; min-height: 150px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-style: italic; }
+
+        /* About Creator */
+        .creator-card {
+            max-width: 600px; margin: 0 auto; padding: 40px; text-align: center; display: flex; flex-direction: column; align-items: center;
+        }
+        .creator-img {
+            width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--secondary); margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .social-links { display: flex; gap: 15px; margin-top: 20px; }
+        .social-links a { color: var(--primary); font-size: 1.5rem; transition: color 0.3s, transform 0.2s; }
+        [data-theme="dark"] .social-links a { color: var(--text-main); }
+        .social-links a:hover { color: var(--secondary); transform: translateY(-3px); }
+
+        /* Footer & Back to top */
+        footer { background: var(--primary); color: white; padding: 60px 0 20px; }
+        .footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; margin-bottom: 40px; }
+        .footer-bottom { text-align: center; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .back-to-top { position: fixed; bottom: 30px; right: 30px; width: 50px; height: 50px; background: var(--secondary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; font-size: 1.5rem; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .back-to-top.visible { opacity: 1; pointer-events: all; }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .menu-toggle { display: block; }
+            .hero { flex-direction: column; text-align: center; padding-top: 120px; }
+            .hero-content { padding-right: 0; margin-bottom: 40px; }
+            .hero-title { font-size: 2.5rem; }
+            .hero-buttons { justify-content: center; }
+            .map-layout { grid-template-columns: 1fr; }
+            #map { height: 400px; }
+            .charts-grid, .compare-grid { grid-template-columns: 1fr; }
+            
+            .nav-content {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                flex-direction: column;
+                background: var(--nav-bg);
+                padding: 20px;
+                border-radius: 0 0 0 15px;
+                box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+            }
+            .nav-links { flex-direction: column; text-align: right; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <h3 style="margin-top: 20px; color: var(--primary);">Memuat Peta Leaflet ASEAN...</h3>
+    </div>
+
+    <div id="scroll-progress"></div>
+
+    <nav id="navbar">
+        <div class="container nav-container">
+            <a href="#" class="logo">
+                <i class="fas fa-globe-asia"></i>
+                ASEAN<span style="color: var(--secondary);">GIS</span>
+            </a>
+            
+            <div class="nav-content" id="nav-content">
+                <ul class="nav-links">
+                    <li><a href="#beranda">Beranda</a></li>
+                    <li><a href="#peta">Peta Interaktif</a></li>
+                    <li><a href="#banding">Perbandingan</a></li>
+                    <li><a href="#galeri">Galeri</a></li>
+                    <li><a href="#kuis">Kuis</a></li>
+                    <li><a href="#kreator">Kreator</a></li>
+                </ul>
+                <button class="theme-toggle" id="theme-btn" title="Toggle Dark Mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+
+            <button class="menu-toggle" id="menu-toggle" title="Toggle Menu">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <section id="beranda" class="hero container">
+        <div class="hero-content" data-aos="fade-right">
+            <h1 class="hero-title">Peta Interaktif Negara-Negara ASEAN</h1>
+            <p class="hero-subtitle">Jelajahi geografi nyata, batas wilayah, dan seluruh provinsi anggota ASEAN menggunakan sistem GIS Leaflet yang modern dan menyenangkan.</p>
+            <div class="hero-buttons">
+                <a href="#kuis" class="btn btn-primary"><i class="fas fa-graduation-cap"></i> Mulai Belajar</a>
+                <a href="#peta" class="btn btn-secondary"><i class="fas fa-map-marked-alt"></i> Jelajahi Peta</a>
+            </div>
+        </div>
+        <div class="hero-image" data-aos="fade-left">
+            <svg viewBox="0 0 400 400" width="100%">
+                <circle cx="200" cy="200" r="180" fill="var(--glass-bg)" stroke="var(--primary)" stroke-width="2" stroke-dasharray="10 10"/>
+                <path d="M100,150 Q200,50 300,150 T250,300 Q150,350 100,250 Z" fill="var(--secondary)" opacity="0.5"/>
+                <path d="M150,100 Q250,150 350,200 T200,350 Q50,250 150,100 Z" fill="var(--primary)" opacity="0.3"/>
+                <text x="200" y="210" text-anchor="middle" fill="var(--primary)" font-size="24" font-weight="bold">ASEAN GIS</text>
+            </svg>
+        </div>
+    </section>
+
+    <div class="container" data-aos="fade-up">
+        <div class="stats-counter glass">
+            <div class="stat-box">
+                <h3>11</h3>
+                <p>Negara Anggota</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="explored-count">0</h3>
+                <p>Telah Dieksplorasi</p>
+            </div>
+            <div class="stat-box">
+                <h3 id="fav-count">0</h3>
+                <p>Negara Favorit</p>
+            </div>
+        </div>
+    </div>
+
+    <section id="peta" class="container">
+        <h2 class="text-center" data-aos="fade-down">Klik Bendera untuk Zoom & Eksplorasi Provinsi</h2>
+        
+        <div class="search-container" data-aos="fade-up">
+            <input type="text" id="search-input" class="search-input" placeholder="Cari negara (contoh: Indonesia, Thailand)...">
+            <div id="search-results" class="search-results"></div>
+        </div>
+
+        <div class="map-layout">
+            <div id="map" data-aos="fade-right"></div>
+
+            <div id="info-panel" class="info-panel glass">
+                <div class="panel-header">
+                    <img id="c-flag" src="" alt="Bendera">
+                    <div>
+                        <h2 id="c-name" style="margin:0;">Nama Negara</h2>
+                        <span id="c-capital" class="text-muted">Ibu Kota</span>
+                    </div>
+                    <div class="header-actions">
+                        <button id="voice-btn" class="action-btn voice-btn" title="Dengarkan Sapaan">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <button id="fav-btn" class="action-btn fav-btn" title="Tambahkan ke Favorit" onclick="toggleFavorite()">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-id-card"></i> Identitas Negara</h4>
+                    <ul class="info-list">
+                        <li><strong>Bahasa:</strong> <span id="c-lang"></span></li>
+                        <li><strong>Mata Uang:</strong> <span id="c-curr"></span></li>
+                        <li><strong>Pemerintahan:</strong> <span id="c-gov"></span></li>
+                    </ul>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-globe-asia"></i> Geografi & Kependudukan</h4>
+                    <ul class="info-list">
+                        <li><strong>Populasi:</strong> <span id="c-pop"></span> jiwa</li>
+                        <li><strong>Luas Wilayah:</strong> <span id="c-area"></span> km²</li>
+                        <li><strong>Iklim:</strong> <span id="c-climate"></span></li>
+                    </ul>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-mask"></i> Budaya & Ekonomi</h4>
+                    <ul class="info-list">
+                        <li><strong>Ekonomi Utama:</strong> <span id="c-eco"></span></li>
+                        <li><strong>Makanan Khas:</strong> <span id="c-food"></span></li>
+                        <li><strong>Rumah/Baju Adat:</strong> <span id="c-culture"></span></li>
+                    </ul>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-map-signs"></i> Wilayah / Provinsi Populer</h4>
+                    <ul id="c-provinces" class="info-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; padding-left:15px; list-style-type:circle;">
+                    </ul>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-camera"></i> Wisata Terkenal</h4>
+                    <div id="c-tourism" class="tags"></div>
+                </div>
+
+                <div class="info-section">
+                    <h4><i class="fas fa-lightbulb"></i> Fakta Menarik</h4>
+                    <ul id="c-facts" class="info-list" style="list-style-type:disc; padding-left:20px;"></ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="banding" class="container">
+        <h2 class="text-center" data-aos="fade-up">Perbandingan Negara</h2>
+        <div class="glass" style="padding: 30px;" data-aos="fade-up">
+            <div class="compare-selects">
+                <select id="comp1" onchange="updateComparison()"></select>
+                <h3 style="margin: 0; align-self: center;">VS</h3>
+                <select id="comp2" onchange="updateComparison()"></select>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="compare-table">
+                    <tr>
+                        <th>Indikator</th>
+                        <th id="th-c1">Negara 1</th>
+                        <th id="th-c2">Negara 2</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Ibu Kota</strong></td>
+                        <td id="td-cap1">-</td>
+                        <td id="td-cap2">-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bahasa</strong></td>
+                        <td id="td-lang1">-</td>
+                        <td id="td-lang2">-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mata Uang</strong></td>
+                        <td id="td-curr1">-</td>
+                        <td id="td-curr2">-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Luas Wilayah (km²)</strong></td>
+                        <td id="td-area1">-</td>
+                        <td id="td-area2">-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Populasi</strong></td>
+                        <td id="td-pop1">-</td>
+                        <td id="td-pop2">-</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section id="galeri" class="container">
+        <h2 class="text-center" data-aos="fade-up">Galeri Pesona ASEAN</h2>
+        <div class="gallery-grid" data-aos="fade-up">
+            <div class="gallery-item" onclick="openModal('https://cdn.pixabay.com/photo/2016/06/24/10/47/architecture-1477041_1280.jpg')">
+                <img src="https://cdn.pixabay.com/photo/2016/06/24/10/47/architecture-1477041_1280.jpg" alt="Bali Indonesia">
+                <div class="gallery-overlay"><span>Bali, Indonesia</span></div>
+            </div>
+            <div class="gallery-item" onclick="openModal('https://cdn.pixabay.com/photo/2013/04/16/14/23/cambodia-105091_1280.jpg')">
+                <img src="https://cdn.pixabay.com/photo/2013/04/16/14/23/cambodia-105091_1280.jpg" alt="Angkor Wat Kamboja">
+                <div class="gallery-overlay"><span>Angkor Wat, Kamboja</span></div>
+            </div>
+            <div class="gallery-item" onclick="openModal('https://cdn.pixabay.com/photo/2018/02/26/16/30/singapore-3183504_1280.jpg')">
+                <img src="https://cdn.pixabay.com/photo/2018/02/26/16/30/singapore-3183504_1280.jpg" alt="Marina Bay Singapura">
+                <div class="gallery-overlay"><span>Marina Bay, Singapura</span></div>
+            </div>
+            <div class="gallery-item" onclick="openModal('https://cdn.pixabay.com/photo/2013/11/20/09/24/kuala-lumpur-213568_1280.jpg')">
+                <img src="https://cdn.pixabay.com/photo/2013/11/20/09/24/kuala-lumpur-213568_1280.jpg" alt="Kuala Lumpur Malaysia">
+                <div class="gallery-overlay"><span>Kuala Lumpur, Malaysia</span></div>
+            </div>
+        </div>
+    </section>
+
+    <div id="imageModal" class="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">&times;</button>
+            <img id="modalImg" src="" alt="Preview">
+        </div>
+    </div>
+
+    <section id="statistik" class="container">
+        <h2 class="text-center" data-aos="fade-up">Statistik ASEAN</h2>
+        <div class="charts-grid" data-aos="fade-up">
+            <div class="chart-container glass">
+                <canvas id="popChart"></canvas>
+            </div>
+            <div class="chart-container glass">
+                <canvas id="areaChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <section id="kuis" class="container">
+        <h2 class="text-center" data-aos="fade-up">Uji Pengetahuanmu!</h2>
+        <div class="quiz-container glass" data-aos="fade-up">
+            <div id="quiz-area">
+                <div class="progress-bar-container">
+                    <div id="quiz-progress" class="quiz-progress"></div>
+                </div>
+                <h3 id="question-text">Pertanyaan akan muncul di sini</h3>
+                <div id="options-container" class="options-grid"></div>
+            </div>
+            <div id="quiz-result">
+                <h3>Kuis Selesai!</h3>
+                <p style="font-size: 4rem; color: var(--secondary); font-weight: bold;" id="score-text">0/10</p>
+                <p id="score-message"></p>
+                <button class="btn btn-primary" onclick="startQuiz()" style="margin-top: 20px;">Ulangi Kuis</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="container fact-section" data-aos="fade-up">
+        <h2>Fakta Unik ASEAN</h2>
+        <button class="btn btn-secondary" onclick="generateFact()"><i class="fas fa-magic"></i> Fakta Hari Ini</button>
+        <div class="fact-box glass">
+            <p id="random-fact-text">Klik tombol di atas untuk melihat fakta menarik tentang negara-negara ASEAN!</p>
+        </div>
+    </section>
+
+    <section id="kreator" class="container" style="padding-bottom: 100px;">
+        <h2 class="text-center" data-aos="fade-up">Tentang Kreator</h2>
+        <div class="creator-card glass" data-aos="fade-up">
+            <img src="https://ui-avatars.com/api/?name=Yulianto&background=0A3D62&color=fff&size=200" alt="Profil Kreator" class="creator-img">
+            <h3 style="margin-bottom: 5px;">Yulianto</h3>
+            <p style="color: var(--text-muted); font-weight: 500; margin-bottom: 15px;">Mahasiswa S3 Universitas Negeri Yogyakarta</p>
+            <p>Halo! Saya adalah pengembang di balik ASEAN GIS. Platform edukasi interaktif ini saya rancang khusus untuk membantu pelajar mengeksplorasi kondisi geografis, budaya, dan data statistik negara-negara di kawasan Asia Tenggara dengan pendekatan visual yang modern dan interaktif. Selamat belajar!</p>
+            <div class="social-links">
+                <a href="#" title="GitHub"><i class="fab fa-github"></i></a>
+                <a href="#" title="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                <a href="#" title="Email"><i class="fas fa-envelope"></i></a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container footer-grid">
+            <div>
+                <h3><i class="fas fa-globe-asia"></i> ASEAN GIS</h3>
+                <p>Platform edukasi interaktif standar spasial GIS untuk siswa SMP. Mempelajari materi IPS Kurikulum Merdeka secara visual dan modern.</p>
+            </div>
+            <div>
+                <h3>Tujuan Pembelajaran</h3>
+                <ul style="list-style: none;">
+                    <li><i class="fas fa-check"></i> Mengidentifikasi letak geografis riil</li>
+                    <li><i class="fas fa-check"></i> Memahami pembagian provinsi/wilayah</li>
+                    <li><i class="fas fa-check"></i> Mengenal potensi sosial budaya</li>
+                </ul>
+            </div>
+            <div>
+                <h3>Referensi Data</h3>
+                <p>Data spasial bersourced dari OpenStreetMap & LeafletJS Engine API.</p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Peta Interaktif ASEAN | Integrasi Leaflet GIS</p>
+        </div>
+    </footer>
+
+    <a href="#" id="back-to-top" class="back-to-top"><i class="fas fa-arrow-up"></i></a>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    
+    <script>
+        AOS.init({ duration: 800, once: true });
+
+        // === NAVBAR TOGGLE LOGIC ===
+        const menuToggle = document.getElementById('menu-toggle');
+        const navContent = document.getElementById('nav-content');
+
+        menuToggle.addEventListener('click', () => {
+            navContent.classList.toggle('hidden');
+        });
+
+        // Pemuatan paksa Voice API di background agar list suara langsung siap
+        if(window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        }
+
+        // === INITIALIZE LEAFLET MAP ===
+        const map = L.map('map').setView([4.5, 115], 4);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO',
+            maxZoom: 18,
+            minZoom: 3
+        }).addTo(map);
+
+        let provinceLayerGroup = L.layerGroup().addTo(map);
+
+        const countriesData = {
+            "Indonesia": {
+                id: "id", coords: [-2.5489, 118.0149], zoom: 5, flag: "https://flagcdn.com/w160/id.png",
+                capital: "Jakarta", lang: "Bahasa Indonesia", curr: "Rupiah (IDR)", gov: "Republik",
+                pop: 275000000, area: 1904569, climate: "Tropis",
+                eco: "Pertanian, Pertambangan, Manufaktur", food: "Nasi Goreng, Rendang", culture: "Rumah Joglo, Kebaya, Batik",
+                greeting: "Halo! Selamat datang di Indonesia.", langCode: "id-ID",
+                tourism: ["Candi Borobudur", "Pulau Bali", "Danau Toba"],
+                facts: ["Negara kepulauan terbesar di dunia.", "Memiliki komodo, kadal purba raksasa satu-satunya di dunia.", "Memiliki lebih dari 700 bahasa daerah."],
+                provinces: [
+                    { name: "DKI Jakarta", cap: "Jakarta", co: [-6.2088, 106.8456] },
+                    { name: "Jawa Barat", cap: "Bandung", co: [-6.9175, 107.6191] },
+                    { name: "Jawa Tengah", cap: "Semarang", co: [-7.0051, 110.4381] },
+                    { name: "Jawa Timur", cap: "Surabaya", co: [-7.2575, 112.7521] },
+                    { name: "Sumatera Utara", cap: "Medan", co: [3.5952, 98.6722] },
+                    { name: "Sulawesi Selatan", cap: "Makassar", co: [-5.1476, 119.4327] },
+                    { name: "Kalimantan Timur", cap: "Samarinda", co: [-0.5022, 117.1536] },
+                    { name: "Papua", cap: "Jayapura", co: [-2.541, 140.718] }
+                ]
+            },
+            "Malaysia": {
+                id: "my", coords: [4.2105, 101.9758], zoom: 6, flag: "https://flagcdn.com/w160/my.png",
+                capital: "Kuala Lumpur", lang: "Melayu", curr: "Ringgit (MYR)", gov: "Monarki Konstitusional Federal",
+                pop: 33000000, area: 330803, climate: "Tropis",
+                eco: "Minyak Sawit, Karet, Elektronik", food: "Nasi Lemak, Laksa", culture: "Rumah Panjang, Baju Kurung",
+                greeting: "Halo! Selamat datang di Malaysia.", langCode: "id-ID", 
+                tourism: ["Menara Kembar Petronas", "Pulau Langkawi", "Gunung Kinabalu"],
+                facts: ["Gua Mulu di Sarawak adalah salah satu gua terbesar di dunia.", "Terdapat bunga Rafflesia, bunga terbesar di dunia.", "Terbagi dua wilayah oleh Laut China Selatan."],
+                provinces: [
+                    { name: "Selangor", cap: "Shah Alam", co: [3.0738, 101.5183] },
+                    { name: "Johor", cap: "Johor Bahru", co: [1.4854, 103.7618] },
+                    { name: "Penang", cap: "George Town", co: [5.4141, 100.3288] },
+                    { name: "Sabah", cap: "Kota Kinabalu", co: [5.9804, 116.0753] },
+                    { name: "Sarawak", cap: "Kuching", co: [1.5533, 110.3592] }
+                ]
+            },
+            "Singapura": {
+                id: "sg", coords: [1.3521, 103.8198], zoom: 11, flag: "https://flagcdn.com/w160/sg.png",
+                capital: "Singapura", lang: "Inggris, Melayu, Mandarin, Tamil", curr: "Dolar Singapura (SGD)", gov: "Republik Parlementer",
+                pop: 5600000, area: 728, climate: "Tropis",
+                eco: "Perdagangan, Keuangan, Teknologi", food: "Chili Crab", culture: "Perpaduan Melayu, Tionghoa, India",
+                greeting: "Hello! Welcome to Singapore.", langCode: "en-SG",
+                tourism: ["Marina Bay Sands", "Gardens by the Bay", "Sentosa Island"],
+                facts: ["Negara terkecil di Asia Tenggara.", "Salah satu dari sedikit negara-kota murni di dunia.", "Bandara Changi adalah salah satu yang terbaik di dunia."],
+                provinces: [
+                    { name: "Central Region", cap: "Downtown Core", co: [1.2921, 103.8518] },
+                    { name: "East Region", cap: "Tampines", co: [1.3524, 103.9447] },
+                    { name: "North Region", cap: "Woodlands", co: [1.4360, 103.7860] }
+                ]
+            },
+            "Thailand": {
+                id: "th", coords: [15.8700, 100.9925], zoom: 5, flag: "https://flagcdn.com/w160/th.png",
+                capital: "Bangkok", lang: "Thai", curr: "Baht (THB)", gov: "Monarki Konstitusional",
+                pop: 71000000, area: 513120, climate: "Tropis Sabana",
+                eco: "Pariwisata, Otomotif, Beras", food: "Tom Yum Goong", culture: "Arsitektur Kuil, Tari Khon",
+                greeting: "Sawasdee khrap! Welcome to Thailand.", langCode: "th-TH",
+                tourism: ["Grand Palace", "Phuket", "Chiang Mai"],
+                facts: ["Satu-satunya negara ASEAN yang bebas dari penjajahan Eropa.", "Dijuluki 'Negeri Gajah Putih'.", "Bangkok memiliki nama resmi terpanjang di dunia."],
+                provinces: [
+                    { name: "Bangkok", cap: "Bangkok", co: [13.7563, 100.5018] },
+                    { name: "Chiang Mai", cap: "Chiang Mai", co: [18.7883, 98.9853] },
+                    { name: "Phuket", cap: "Phuket Town", co: [7.8804, 98.3922] },
+                    { name: "Chonburi", cap: "Chonburi", co: [13.3611, 100.9847] }
+                ]
+            },
+            "Filipina": {
+                id: "ph", coords: [12.8797, 121.7740], zoom: 5, flag: "https://flagcdn.com/w160/ph.png",
+                capital: "Manila", lang: "Filipino, Inggris", curr: "Peso Filipina (PHP)", gov: "Republik Konstitusional",
+                pop: 113000000, area: 300000, climate: "Tropis Basah",
+                eco: "BPO, Pertanian, Elektronik", food: "Adobo, Sinigang", culture: "Bahay Kubo, Barong Tagalog",
+                greeting: "Mabuhay! Welcome to the Philippines.", langCode: "en-PH",
+                tourism: ["Boracay", "Palawan", "Chocolate Hills"],
+                facts: ["Terdiri dari lebih dari 7.600 pulau.", "Produsen kelapa terbesar di dunia.", "Alat transportasi umum ikoniknya adalah Jeepney."],
+                provinces: [
+                    { name: "Metro Manila", cap: "Manila", co: [14.5995, 120.9842] },
+                    { name: "Cebu", cap: "Cebu City", co: [10.3157, 123.8854] },
+                    { name: "Davao", cap: "Davao City", co: [7.1907, 125.4553] },
+                    { name: "Ilocos", cap: "Laoag", co: [18.1764, 120.5929] }
+                ]
+            },
+            "Brunei Darussalam": {
+                id: "bn", coords: [4.5353, 114.7277], zoom: 9, flag: "https://flagcdn.com/w160/bn.png",
+                capital: "Bandar Seri Begawan", lang: "Melayu", curr: "Dolar Brunei (BND)", gov: "Monarki Absolut Islami",
+                pop: 445000, area: 5765, climate: "Tropis Khatulistiwa",
+                eco: "Minyak Bumi, Gas Alam", food: "Ambuyat", culture: "Seni Tenun Jong Sarat",
+                greeting: "Halo! Selamat datang di Brunei Darussalam.", langCode: "id-ID",
+                tourism: ["Masjid Sultan Omar Ali Saifuddien", "Kampong Ayer", "Ulu Temburong"],
+                facts: ["Salah satu negara dengan PDB per kapita tertinggi di dunia.", "Kampong Ayer adalah pemukiman terapung terbesar sedunia.", "Bebas pajak pendapatan bagi warga negaranya."],
+                provinces: [
+                    { name: "Brunei-Muara", cap: "Bandar Seri Begawan", co: [4.8916, 114.9431] },
+                    { name: "Tutong", cap: "Pekan Tutong", co: [4.8021, 114.6499] },
+                    { name: "Belait", cap: "Kuala Belait", co: [4.5822, 114.1952] },
+                    { name: "Temburong", cap: "Bangar", co: [4.6069, 115.1321] }
+                ]
+            },
+            "Vietnam": {
+                id: "vn", coords: [14.0583, 108.2772], zoom: 5, flag: "https://flagcdn.com/w160/vn.png",
+                capital: "Hanoi", lang: "Vietnam", curr: "Dong (VND)", gov: "Republik Sosialis",
+                pop: 98000000, area: 331212, climate: "Tropis Monsun",
+                eco: "Tekstil, Kopi, Gadget Elektronik", food: "Pho, Banh Mi", culture: "Ao Dai, Topi Caping Non La",
+                greeting: "Xin chào! Welcome to Vietnam.", langCode: "vi-VN",
+                tourism: ["Ha Long Bay", "Hoi An", "Delta Mekong"],
+                facts: ["Gua Son Doong adalah struktur gua terbesar di bumi.", "Produsen kopi terbesar kedua global.", "Bentuk peta negaranya memanjang menyerupai alfabet 'S'."],
+                provinces: [
+                    { name: "Hanoi", cap: "Hanoi", co: [21.0285, 105.8542] },
+                    { name: "Ho Chi Minh City", cap: "Ho Chi Minh", co: [10.8231, 106.6297] },
+                    { name: "Da Nang", cap: "Da Nang", co: [16.0544, 108.2022] },
+                    { name: "Hai Phong", cap: "Hai Phong", co: [20.8449, 106.6881] }
+                ]
+            },
+            "Laos": {
+                id: "la", coords: [19.8563, 102.4955], zoom: 5, flag: "https://flagcdn.com/w160/la.png",
+                capital: "Vientiane", lang: "Lao", curr: "Kip (LAK)", gov: "Republik Sosialis",
+                pop: 7400000, area: 236800, climate: "Tropis Monsun",
+                eco: "Tenaga Hidroelektrik, Tambang", food: "Larb, Sticky Rice", culture: "Kain Sinh Tradisional",
+                greeting: "Sabaidi! Welcome to Laos.", langCode: "en-US",
+                tourism: ["Luang Prabang", "Pha That Luang", "Vang Vieng"],
+                facts: ["Satu-satunya negara ASEAN yang tidak berbatasan langsung dengan laut.", "Disebut sebagai 'Negeri Sejuta Gajah'.", "Pemasok listrik utama untuk tetangganya."],
+                provinces: [
+                    { name: "Vientiane", cap: "Vientiane", co: [17.9757, 102.6331] },
+                    { name: "Luang Prabang", cap: "Luang Prabang", co: [19.8833, 102.1333] },
+                    { name: "Savannakhet", cap: "Savannakhet", co: [16.5661, 104.7558] }
+                ]
+            },
+            "Myanmar": {
+                id: "mm", coords: [21.9162, 95.9560], zoom: 5, flag: "https://flagcdn.com/w160/mm.png",
+                capital: "Naypyidaw", lang: "Birma", curr: "Kyat (MMK)", gov: "Republik Kesatuan Parlementer",
+                pop: 54000000, area: 676578, climate: "Tropis Variatif",
+                eco: "Gas Alam, Komoditas Kayu, Giok", food: "Mohinga", culture: "Kain Sarung Longyi, Bedak Thanaka",
+                greeting: "Mingalaba! Welcome to Myanmar.", langCode: "en-US",
+                tourism: ["Bagan Kompleks", "Danau Inle", "Pagoda Shwedagon"],
+                facts: ["Menyimpan situs arkeologi candi buddha kuno terbanyak di Bagan.", "Masyarakat lokal memakai kosmetik organik pohon Thanaka.", "Negara terluas di daratan Asia Tenggara."],
+                provinces: [
+                    { name: "Yangon", cap: "Yangon", co: [16.8409, 96.1735] },
+                    { name: "Mandalay", cap: "Mandalay", co: [21.9588, 96.0891] },
+                    { name: "Shan State", cap: "Taunggyi", co: [20.7884, 97.0337] },
+                    { name: "Naypyidaw", cap: "Naypyidaw", co: [19.7633, 96.0785] }
+                ]
+            },
+            "Kamboja": {
+                id: "kh", coords: [12.5657, 104.9910], zoom: 6, flag: "https://flagcdn.com/w160/kh.png",
+                capital: "Phnom Penh", lang: "Khmer", curr: "Riel (KHR)", gov: "Monarki Konstitusional",
+                pop: 16000000, area: 181035, climate: "Tropis Monsun",
+                eco: "Garmen & Tekstil, Pariwisata", food: "Amok Fish", culture: "Tari Klasik Apsara, Krama Syal",
+                greeting: "Choum reap sor! Welcome to Cambodia.", langCode: "en-US",
+                tourism: ["Angkor Wat", "Tonle Sap", "Royal Palace Phnom Penh"],
+                facts: ["Angkor Wat dinobatkan sebagai kompleks candi keagamaan terluas di bumi.", "Satu-satunya bendera nasional dengan ilustrasi gedung.", "Sistem air Danau Tonle Sap membalikkan arus dua kali setahun."],
+                provinces: [
+                    { name: "Phnom Penh", cap: "Phnom Penh", co: [11.5564, 104.9282] },
+                    { name: "Siem Reap", cap: "Siem Reap", co: [13.3633, 103.8564] },
+                    { name: "Preah Sihanouk", cap: "Sihanoukville", co: [10.6094, 103.5292] }
+                ]
+            },
+            "Timor-Leste": {
+                id: "tl", coords: [-8.8742, 125.7275], zoom: 8, flag: "https://flagcdn.com/w160/tl.png",
+                capital: "Dili", lang: "Tetun, Portugis", curr: "Dolar AS (USD)", gov: "Republik Semi-Presidensial",
+                pop: 1300000, area: 14874, climate: "Tropis",
+                eco: "Kopi Arabika, Ekstraksi Gas", food: "Batar Da'an", culture: "Tenun Tradisional Kain Tais",
+                greeting: "Bondia! Welcome to Timor-Leste.", langCode: "pt-PT",
+                tourism: ["Pulau Atauro", "Cristo Rei Dili", "Gunung Ramelau"],
+                facts: ["Negara paling muda yang resmi bergabung ke ASEAN.", "Mayoritas beragama Katolik bersama dengan Filipina.", "Perairan Pulau Atauro kaya akan keragaman hayati karang."],
+                provinces: [
+                    { name: "Dili", cap: "Dili", co: [-8.5568, 125.5603] },
+                    { name: "Baucau", cap: "Baucau", co: [-8.4711, 126.4583] },
+                    { name: "Ermera", cap: "Gleno", co: [-8.7167, 125.4333] }
+                ]
+            }
+        };
+
+        const countriesList = Object.keys(countriesData);
+        let exploredCountries = new Set(JSON.parse(localStorage.getItem('explored_asean') || '[]'));
+        let favoriteCountries = JSON.parse(localStorage.getItem('favorites_asean') || '[]');
+        let currentCountry = null;
+
+        function initCountryMarkers() {
+            countriesList.forEach(name => {
+                const c = countriesData[name];
+                const flagIcon = L.icon({
+                    iconUrl: c.flag,
+                    iconSize: [40, 26],
+                    iconAnchor: [20, 13],
+                    popupAnchor: [0, -10],
+                    className: 'custom-flag-icon'
+                });
+
+                const marker = L.marker(c.coords, { icon: flagIcon }).addTo(map);
+                marker.bindTooltip(`<b>${name}</b><br>Ibu Kota: ${c.capital}`, { direction: 'top', opacity: 0.9 });
+                marker.on('click', () => showCountry(name));
+            });
+        }
+
+        function showCountry(name) {
+            currentCountry = name;
+            const data = countriesData[name];
+            if(!data) return;
+
+            map.flyTo(data.coords, data.zoom, { animate: true, duration: 1.5 });
+            provinceLayerGroup.clearLayers();
+
+            data.provinces.forEach(p => {
+                if(p.co.length >= 2) {
+                    const provMarker = L.circleMarker(p.co, {
+                        radius: 8, fillColor: '#20BF6B', color: '#fff', weight: 2,
+                        opacity: 1, fillOpacity: 0.8, className: 'province-marker'
+                    }).addTo(provinceLayerGroup);
+                    provMarker.bindPopup(`<b>Wilayah/Provinsi:</b> ${p.name}<br><b>Pusat Administrasi:</b> ${p.cap}`);
+                }
+            });
+
+            if(!exploredCountries.has(name)) {
+                exploredCountries.add(name);
+                localStorage.setItem('explored_asean', JSON.stringify([...exploredCountries]));
+                updateCounters();
+            }
+
+            document.getElementById('c-flag').src = data.flag;
+            document.getElementById('c-name').textContent = name;
+            document.getElementById('c-capital').textContent = data.capital;
+            document.getElementById('c-lang').textContent = data.lang;
+            document.getElementById('c-curr').textContent = data.curr;
+            document.getElementById('c-gov').textContent = data.gov;
+            document.getElementById('c-pop').textContent = data.pop.toLocaleString('id-ID');
+            document.getElementById('c-area').textContent = data.area.toLocaleString('id-ID');
+            document.getElementById('c-climate').textContent = data.climate;
+            document.getElementById('c-eco').textContent = data.eco;
+            document.getElementById('c-food').textContent = data.food;
+            document.getElementById('c-culture').textContent = data.culture;
+
+            const pList = document.getElementById('c-provinces');
+            pList.innerHTML = '';
+            data.provinces.forEach(p => {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${p.name}</strong>`;
+                pList.appendChild(li);
+            });
+
+            const tContainer = document.getElementById('c-tourism');
+            tContainer.innerHTML = '';
+            data.tourism.forEach(t => {
+                const s = document.createElement('span'); s.className = 'tag'; s.textContent = t; tContainer.appendChild(s);
+            });
+
+            const fContainer = document.getElementById('c-facts');
+            fContainer.innerHTML = '';
+            data.facts.forEach(f => {
+                const li = document.createElement('li'); li.textContent = f; fContainer.appendChild(li);
+            });
+
+            const favBtn = document.getElementById('fav-btn');
+            if(favoriteCountries.includes(name)) favBtn.classList.add('active');
+            else favBtn.classList.remove('active');
+
+            const voiceBtn = document.getElementById('voice-btn');
+            voiceBtn.onclick = () => playVoice(data.greeting, data.langCode);
+
+            const panel = document.getElementById('info-panel');
+            panel.style.display = 'block';
+            panel.style.animation = 'none';
+            panel.offsetHeight; 
+            panel.style.animation = null; 
+
+            if(window.innerWidth <= 768) {
+                panel.scrollIntoView({behavior: "smooth", block: "start"});
+            }
+        }
+
+        // === FITUR VOICE GREETING (PEREMPUAN / HUMANIZE) ===
+        function playVoice(text, langCode) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Humanize Voice Settings:
+                utterance.lang = langCode;
+                utterance.rate = 0.9;  // Sedikit diperlambat agar natural
+                utterance.pitch = 1.1; // Nada dinaikkan sedikit agar terkesan suara perempuan/lembut
+
+                const voices = window.speechSynthesis.getVoices();
+                
+                if (voices.length > 0) {
+                    // Cari suara berdasarkan bahasanya
+                    const langVoices = voices.filter(v => v.lang.startsWith(langCode.split('-')[0]));
+                    let selectedVoice = null;
+
+                    if (langVoices.length > 0) {
+                        // Mencari profil suara perempuan (berdasarkan kata kunci umum OS)
+                        selectedVoice = langVoices.find(v => 
+                            v.name.toLowerCase().includes('female') || 
+                            v.name.toLowerCase().includes('perempuan') ||
+                            v.name.toLowerCase().includes('zira') || 
+                            v.name.includes('Google') // Google sering punya voice female yg bagus sbg default
+                        );
+                        // Fallback jika tidak nemu keyword di atas
+                        if (!selectedVoice) selectedVoice = langVoices[0];
+                    }
+
+                    if (selectedVoice) {
+                        utterance.voice = selectedVoice;
+                    }
+                }
+
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Browser Anda belum mendukung fitur Web Speech API.");
+            }
+        }
+
+        // === SEARCH BAR INTEGRATION ===
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        
+        searchInput.addEventListener('input', function() {
+            const val = this.value.toLowerCase();
+            searchResults.innerHTML = '';
+            if(val === '') {
+                searchResults.style.display = 'none'; return;
+            }
+            const matches = countriesList.filter(c => c.toLowerCase().includes(val) || countriesData[c].capital.toLowerCase().includes(val));
+            
+            if(matches.length > 0) {
+                searchResults.style.display = 'block';
+                matches.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = 'search-item';
+                    div.innerHTML = `<strong>${m}</strong> - Ibu Kota: ${countriesData[m].capital}`;
+                    div.onclick = () => {
+                        showCountry(m);
+                        searchInput.value = '';
+                        searchResults.style.display = 'none';
+                    };
+                    searchResults.appendChild(div);
+                });
+            } else {
+                searchResults.style.display = 'block';
+                searchResults.innerHTML = '<div class="search-item">Negara tidak ditemukan</div>';
+            }
+        });
+
+        function toggleFavorite() {
+            if(!currentCountry) return;
+            const index = favoriteCountries.indexOf(currentCountry);
+            const btn = document.getElementById('fav-btn');
+            if(index === -1) {
+                favoriteCountries.push(currentCountry);
+                btn.classList.add('active');
+            } else {
+                favoriteCountries.splice(index, 1);
+                btn.classList.remove('active');
+            }
+            localStorage.setItem('favorites_asean', JSON.stringify(favoriteCountries));
+            updateCounters();
+        }
+
+        function updateCounters() {
+            document.getElementById('explored-count').textContent = exploredCountries.size;
+            document.getElementById('fav-count').textContent = favoriteCountries.length;
+        }
+
+        function initComparison() {
+            const s1 = document.getElementById('comp1');
+            const s2 = document.getElementById('comp2');
+            countriesList.forEach((c, i) => {
+                s1.add(new Option(c, c, false, i === 0));
+                s2.add(new Option(c, c, false, i === 1));
+            });
+            updateComparison();
+        }
+
+        function updateComparison() {
+            const c1 = document.getElementById('comp1').value;
+            const c2 = document.getElementById('comp2').value;
+            const d1 = countriesData[c1];
+            const d2 = countriesData[c2];
+
+            document.getElementById('th-c1').textContent = c1;
+            document.getElementById('th-c2').textContent = c2;
+            
+            document.getElementById('td-cap1').textContent = d1.capital;
+            document.getElementById('td-cap2').textContent = d2.capital;
+            document.getElementById('td-lang1').textContent = d1.lang;
+            document.getElementById('td-lang2').textContent = d2.lang;
+            document.getElementById('td-curr1').textContent = d1.curr;
+            document.getElementById('td-curr2').textContent = d2.curr;
+            document.getElementById('td-area1').textContent = d1.area.toLocaleString('id-ID');
+            document.getElementById('td-area2').textContent = d2.area.toLocaleString('id-ID');
+            document.getElementById('td-pop1').textContent = d1.pop.toLocaleString('id-ID');
+            document.getElementById('td-pop2').textContent = d2.pop.toLocaleString('id-ID');
+        }
+
+        let chartPop, chartArea;
+        function initCharts() {
+            const labels = countriesList;
+            const popData = labels.map(c => countriesData[c].pop);
+            const areaData = labels.map(c => countriesData[c].area);
+
+            const ctxPop = document.getElementById('popChart').getContext('2d');
+            chartPop = new Chart(ctxPop, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Jumlah Penduduk (Jiwa)', data: popData, backgroundColor: '#0A3D62', borderRadius: 5 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctxArea = document.getElementById('areaChart').getContext('2d');
+            chartArea = new Chart(ctxArea, {
+                type: 'pie',
+                data: { labels: labels, datasets: [{ label: 'Luas Wilayah (km²)', data: areaData, backgroundColor: ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEEAD','#D4A5A5','#9B59B6','#3498DB','#2ECC71','#F1C40F','#E67E22'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        const quizData = [
+            { q: "Negara manakah di ASEAN yang tidak memiliki laut (landlocked)?", o: ["Laos", "Kamboja", "Vietnam", "Myanmar"], a: 0 },
+            { q: "Mata uang negara Thailand adalah?", o: ["Ringgit", "Baht", "Peso", "Kyat"], a: 1 },
+            { q: "Angkor Wat merupakan monumen keagamaan kuno yang terletak di?", o: ["Indonesia", "Thailand", "Kamboja", "Myanmar"], a: 2 },
+            { q: "Negara kota dengan wilayah terkecil di kawasan ASEAN adalah?", o: ["Brunei Darussalam", "Singapura", "Timor-Leste", "Kamboja"], a: 1 },
+            { q: "Ibu kota negara Filipina adalah?", o: ["Hanoi", "Kuala Lumpur", "Manila", "Dili"], a: 2 },
+            { q: "Negara ASEAN yang dijuluki sebagai 'Negeri Gajah Putih' adalah?", o: ["Laos", "Thailand", "Malaysia", "Vietnam"], a: 1 },
+            { q: "Gunung Kinabalu dan wilayah negara bagian Sabah berada di?", o: ["Indonesia", "Filipina", "Malaysia", "Brunei Darussalam"], a: 2 },
+            { q: "Mata uang resmi perdagangan yang dipakai oleh Timor-Leste adalah?", o: ["Rupiah", "Dolar Singapura", "Dolar AS", "Escudo"], a: 2 },
+            { q: "Kampong Ayer, pemukiman air terapung terbesar di dunia, ada di?", o: ["Brunei Darussalam", "Indonesia", "Malaysia", "Vietnam"], a: 0 },
+            { q: "Menara Kembar Petronas berdiri megah di pusat kota?", o: ["Jakarta", "Singapura", "Kuala Lumpur", "Bangkok"], a: 2 }
+        ];
+
+        let currentQuizIndex = 0; let quizScore = 0;
+
+        function startQuiz() {
+            currentQuizIndex = 0; quizScore = 0;
+            document.getElementById('quiz-result').style.display = 'none';
+            document.getElementById('quiz-area').style.display = 'block';
+            quizData.sort(() => Math.random() - 0.5);
+            loadQuizQuestion();
+        }
+
+        function loadQuizQuestion() {
+            const q = quizData[currentQuizIndex];
+            document.getElementById('question-text').textContent = `${currentQuizIndex + 1}. ${q.q}`;
+            const optsContainer = document.getElementById('options-container');
+            optsContainer.innerHTML = '';
+            
+            const progress = ((currentQuizIndex) / quizData.length) * 100;
+            document.getElementById('quiz-progress').style.width = progress + "%";
+
+            q.o.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(index, btn, q.a);
+                optsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, btnElement, correct) {
+            const buttons = document.querySelectorAll('.option-btn');
+            buttons.forEach(b => b.disabled = true);
+
+            if (selected === correct) {
+                btnElement.classList.add('correct');
+                quizScore++;
+            } else {
+                btnElement.classList.add('wrong');
+                buttons[correct].classList.add('correct');
+            }
+
+            setTimeout(() => {
+                currentQuizIndex++;
+                if(currentQuizIndex < quizData.length) loadQuizQuestion();
+                else finishQuiz();
+            }, 1000);
+        }
+
+        function finishQuiz() {
+            document.getElementById('quiz-area').style.display = 'none';
+            const resultDiv = document.getElementById('quiz-result');
+            resultDiv.style.display = 'block';
+            document.getElementById('score-text').textContent = `${quizScore} / 10`;
+            let msg = quizScore >= 7 ? "Hebat! Pemahaman spasial IPS kamu juara!" : "Ayo baca lagi info detail di peta dan ulangi kuis!";
+            document.getElementById('score-message').textContent = msg;
+            document.getElementById('quiz-progress').style.width = "100%";
+        }
+
+        const allFacts = [
+            "Indonesia memiliki lebih dari 17.000 pulau, menjadikannya negara kepulauan terbesar.",
+            "Thailand adalah satu-satunya negara di Asia Tenggara yang tidak pernah dijajah bangsa Eropa.",
+            "Laos adalah satu-satunya negara ASEAN yang dikelilingi daratan (Landlocked).",
+            "Angkor Wat di Kamboja adalah monumen keagamaan terbesar di dunia.",
+            "Gua Son Doong di Vietnam adalah gua alami terbesar di dunia."
+        ];
+
+        function generateFact() {
+            const randomIndex = Math.floor(Math.random() * allFacts.length);
+            const factText = document.getElementById('random-fact-text');
+            factText.style.opacity = 0;
+            setTimeout(() => {
+                factText.textContent = `"${allFacts[randomIndex]}"`;
+                factText.style.opacity = 1;
+            }, 300);
+        }
+
+        const themeBtn = document.getElementById('theme-btn');
+        themeBtn.addEventListener('click', () => {
+            const html = document.documentElement;
+            const isDark = html.getAttribute('data-theme') === 'dark';
+            html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            themeBtn.innerHTML = isDark ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+        });
+
+        // === NAVBAR HIDE/SHOW LOGIC & SCROLL EVENT ===
+        let lastScrollTop = 0;
+        const navbar = document.getElementById('navbar');
+
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+            }, 1000);
+            initCountryMarkers();
+            updateCounters();
+            initComparison();
+            initCharts();
+            startQuiz();
+        });
+
+        window.onscroll = function() {
+            let scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            let height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            
+            // 1. Scroll Progress Bar
+            let scrolled = (scrollTop / height) * 100;
+            document.getElementById("scroll-progress").style.width = scrolled + "%";
+
+            // 2. Navbar Hide/Show on Scroll
+            if (scrollTop > lastScrollTop && scrollTop > 80) {
+                // Scroll ke bawah (Sembunyikan Navbar)
+                navbar.style.top = "-80px"; 
+            } else {
+                // Scroll ke atas (Munculkan Navbar)
+                navbar.style.top = "0";
+            }
+            lastScrollTop = scrollTop <= 0 ? 0 : scrollTop; // Menghindari nilai negatif
+
+            // 3. Back to Top Button
+            const backToTop = document.getElementById('back-to-top');
+            if (scrollTop > 300) backToTop.classList.add('visible');
+            else backToTop.classList.remove('visible');
+        };
+
+        function openModal(src) { document.getElementById('modalImg').src = src; document.getElementById('imageModal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('imageModal').style.display = 'none'; }
+    </script>
+</body>
+</html>
